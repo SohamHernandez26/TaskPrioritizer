@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "148656186482",
+    "project_id": "taskprioritizer-b4fdd",
+    "storage_bucket": "taskprioritizer-b4fdd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:148656186482:android:d1c5a28c4ab08104cf4eeb",
+        "android_client_info": {
+          "package_name": "com.example.taskprioritizer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD53sSpHClzhLU_dhbdigb7VJ9VwIoj5qI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
