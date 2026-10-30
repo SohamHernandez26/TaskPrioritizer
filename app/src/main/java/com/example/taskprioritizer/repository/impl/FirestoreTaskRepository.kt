@@ -18,76 +18,97 @@ class FirestoreTaskRepository(
     private val auth: FirebaseAuth
 ) : TaskRepository {
 
-    private fun tasks() =
+    private fun tasks(uid: String) =
         firestore.collection("users")
-            .document(requireNotNull(auth.currentUser).uid)
+            .document(uid)
             .collection("tasks")
 
-    override fun observeTasks(): Flow<List<Task>> =
-        callbackFlow {
-            val user = auth.currentUser
-
-            if (user == null) {
-                close(IllegalStateException("Inicia sesión"))
-            } else {
-                val listener = tasks()
-                    .addSnapshotListener { snapshot, error ->
-                        if (error != null) {
-                            close(error)
-                            return@addSnapshotListener
-                        }
-
-                        val result = runCatching {
-                            snapshot?.documents.orEmpty().map { doc ->
-                                Task(
-                                    id = doc.id,
-                                    title = doc.getString("title").orEmpty(),
-                                    notes = doc.getString("notes").orEmpty(),
-                                    priority = Prioridad.valueOf(
-                                        doc.getString("priority") ?: "MEDIA"
-                                    ),
-                                    estimatedMinutes = (
-                                            doc.getLong("estimatedMinutes") ?: 30L
-                                            ).toInt(),
-                                    dueDate = LocalDate.parse(
-                                        doc.getString("dueDate")
-                                            ?: LocalDate.now().toString()
-                                    ),
-                                    status = EstadoTarea.valueOf(
-                                        doc.getString("status") ?: "PENDIENTE"
-                                    ),
-                                    ownerId = doc.getString("ownerId").orEmpty()
-                                )
-                            }
-                        }
-
-                        result.onSuccess { trySend(it) }
-                            .onFailure { close(it) }
-                    }
-
-                awaitClose { listener.remove() }
-            }
+    private fun currentUid(): String =
+        requireNotNull(auth.currentUser?.uid) {
+            "Debes iniciar sesión para realizar esta operación"
         }
+
+    override fun observeTasks(): Flow<List<Task>> = callbackFlow {
+        val user = auth.currentUser
+
+        if (user == null) {
+            close(IllegalStateException("Inicia sesión"))
+            return@callbackFlow
+        }
+
+        val listener = tasks(user.uid)
+            .addSnapshotListener { snapshot, error ->
+
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                val result = runCatching {
+                    snapshot?.documents.orEmpty().map { doc ->
+
+                        Task(
+                            id = doc.id,
+                            title = doc.getString("title").orEmpty(),
+                            notes = doc.getString("notes").orEmpty(),
+                            priority = Prioridad.valueOf(
+                                doc.getString("priority") ?: "MEDIA"
+                            ),
+                            estimatedMinutes = (
+                                    doc.getLong("estimatedMinutes") ?: 30L
+                                    ).toInt(),
+                            dueDate = LocalDate.parse(
+                                doc.getString("dueDate")
+                                    ?: LocalDate.now().toString()
+                            ),
+                            status = EstadoTarea.valueOf(
+                                doc.getString("status") ?: "PENDIENTE"
+                            ),
+                            ownerId = doc.getString("ownerId").orEmpty()
+                        )
+                    }
+                }
+
+                result
+                    .onSuccess { trySend(it) }
+                    .onFailure { close(it) }
+            }
+
+        awaitClose {
+            listener.remove()
+        }
+    }
 
     override suspend fun createTask(task: Task): Result<Unit> =
         runCatching {
-            val uid = requireNotNull(auth.currentUser).uid
-            val document = tasks().document()
+            val uid = currentUid()
+            val document = tasks(uid).document()
+
             document.set(task.toMap(uid)).await()
             Unit
         }
 
     override suspend fun updateTask(task: Task): Result<Unit> =
         runCatching {
-            val uid = requireNotNull(auth.currentUser).uid
-            tasks().document(task.id)
-                .update(task.toMap(uid)).await()
+            val uid = currentUid()
+
+            tasks(uid)
+                .document(task.id)
+                .update(task.toMap(uid))
+                .await()
+
             Unit
         }
 
     override suspend fun deleteTask(taskId: String): Result<Unit> =
         runCatching {
-            tasks().document(taskId).delete().await()
+            val uid = currentUid()
+
+            tasks(uid)
+                .document(taskId)
+                .delete()
+                .await()
+
             Unit
         }
 
