@@ -1,5 +1,4 @@
-package com.example.taskprioritizer.model
-
+﻿package com.example.taskprioritizer.model
 
 import java.time.LocalDate
 
@@ -11,6 +10,19 @@ enum class EstadoTarea {
     PENDIENTE, COMPLETADA
 }
 
+// Modelo nuevo: integración con Firestore.
+data class Task(
+    val id: String,
+    val title: String,
+    val notes: String = "",
+    val priority: Prioridad = Prioridad.MEDIA,
+    val estimatedMinutes: Int = 30,
+    val dueDate: LocalDate = LocalDate.now(),
+    val status: EstadoTarea = EstadoTarea.PENDIENTE,
+    val ownerId: String = ""
+)
+
+// Modelo anterior: conservar temporalmente para las pantallas existentes.
 data class Tarea(
     val id: Int,
     val titulo: String,
