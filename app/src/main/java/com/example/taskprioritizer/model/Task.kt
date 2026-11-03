@@ -1,36 +1,28 @@
-﻿
 package com.example.taskprioritizer.model
 
 import java.time.LocalDate
 
-enum class Prioridad {
-    ALTA, MEDIA, BAJA
-}
+enum class Priority { HIGH, MEDIUM, LOW }
 
-enum class EstadoTarea {
-    PENDIENTE, COMPLETADA
-}
+enum class TaskStatus { PENDING, COMPLETED }
 
-// Modelo nuevo para Firestore
 data class Task(
     val id: String,
     val title: String,
     val notes: String = "",
-    val priority: Prioridad = Prioridad.MEDIA,
+    val priority: Priority = Priority.MEDIUM,
     val estimatedMinutes: Int = 30,
     val dueDate: LocalDate = LocalDate.now(),
-    val status: EstadoTarea = EstadoTarea.PENDIENTE,
-    val ownerId: String = ""
+    val status: TaskStatus = TaskStatus.PENDING,
+    val ownerId: String = "",
+    val createdAt: Long = System.currentTimeMillis()
 )
 
-// Modelo anterior para mantener compatibilidad
-data class Tarea(
-    val id: Int,
-    val titulo: String,
-    val notas: String = "",
-    val prioridad: Prioridad,
-    val tiempoEstimadoMinutos: Int,
-    val fechaEntrega: LocalDate,
-    val estado: EstadoTarea = EstadoTarea.PENDIENTE,
-    val diasSinAtender: Int = 0
+data class TaskSnapshot(
+    val tasks: List<Task> = emptyList(),
+    val isFromCache: Boolean = false,
+    val hasPendingWrites: Boolean = false,
+    val syncError: String? = null
 )
+
+enum class WriteOutcome { SYNCED, PENDING }

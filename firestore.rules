@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+    match /databases/{database}/documents {
+        function isOwner(userId) {
+            return request.auth != null && request.auth.uid == userId;
+        }
+
+        function validTask(userId) {
+            let task = request.resource.data;
+            return task.keys().hasAll([
+                'title', 'notes', 'priority', 'estimatedMinutes',
+                'dueDate', 'status', 'ownerId', 'createdAt'
+            ]) && task.keys().hasOnly([
+                'title', 'notes', 'priority', 'estimatedMinutes',
+                'dueDate', 'status', 'ownerId', 'createdAt'
+            ])
+            && task.ownerId == userId
+            && task.title is string && task.title.size() >= 3 && task.title.size() <= 50
+            && task.notes is string && task.notes.size() <= 500
+            && task.priority in ['HIGH', 'MEDIUM', 'LOW']
+            && task.estimatedMinutes is int && task.estimatedMinutes >= 1 && task.estimatedMinutes <= 1440
+            && task.dueDate is string && task.dueDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && task.status in ['PENDING', 'COMPLETED']
+            && task.createdAt is int && task.createdAt >= 0;
+        }
+
+        match /users/{userId}/tasks/{taskId} {
+            allow read: if isOwner(userId);
+            allow create: if isOwner(userId) && validTask(userId)
+                && request.resource.data.status == 'PENDING';
+            allow update: if isOwner(userId) && validTask(userId)
+                && resource.data.status in ['PENDING', 'PENDIENTE']
+                && request.resource.data.createdAt == resource.data.get('createdAt', 0);
+            allow delete: if isOwner(userId)
+                && resource.data.status in ['PENDING', 'PENDIENTE'];
+        }
+        match /{document=**} {
+            allow read, write: if false;
+        }
+    }
+}
