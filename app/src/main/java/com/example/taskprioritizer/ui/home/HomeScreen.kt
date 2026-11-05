@@ -43,7 +43,7 @@ fun HomeScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(title = { Text("Mis tareas") }, actions = {
+            TopAppBar(title = { Text("Mis tareas académicas") }, actions = {
                 TextButton(onClick = onPlanClick) { Text("Plan") }
                 TextButton(onClick = onSignOut) { Text("Salir") }
             })

@@ -17,10 +17,21 @@ android {
         applicationId = "com.example.taskprioritizer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    providers.environmentVariable("TASKPRIORITIZER_DEBUG_KEYSTORE").orNull?.let { keyPath ->
+        signingConfigs {
+            getByName("debug") {
+                storeFile = file(keyPath)
+                storePassword = "android"
+                keyAlias = "AndroidDebugKey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
