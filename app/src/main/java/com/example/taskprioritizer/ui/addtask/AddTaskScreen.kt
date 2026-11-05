@@ -2,169 +2,146 @@ package com.example.taskprioritizer.ui.addtask
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.taskprioritizer.data.MockData
-import com.example.taskprioritizer.model.EstadoTarea
-import com.example.taskprioritizer.model.Prioridad
-import com.example.taskprioritizer.model.Tarea
+import com.example.taskprioritizer.model.Priority
+import com.example.taskprioritizer.ui.common.FeedbackCard
+import com.example.taskprioritizer.ui.common.LoadingState
+import com.example.taskprioritizer.ui.common.displayName
+import java.time.Instant
 import java.time.LocalDate
-
-// Opciones de tiempo estimado: lo que se ve en pantalla y los minutos reales que guardamos.
-private val opcionesTiempo = listOf(
-    "10m" to 10,
-    "30m" to 30,
-    "1h" to 60,
-    "1h 30m" to 90,
-    "2h" to 120
-)
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskScreen(
-    onGuardar: () -> Unit,
-    onCancelar: () -> Unit
+    state: AddTaskUiState,
+    onTitleChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
+    onPriorityChange: (Priority) -> Unit,
+    onMinutesChange: (String) -> Unit,
+    onDateChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-
-    var nombre by remember { mutableStateOf("") }
-    var prioridadSeleccionada by remember { mutableStateOf<Prioridad?>(null) }
-    var tiempoSeleccionado by remember { mutableStateOf<Int?>(null) }
-
-    //
-    val nombreError = when {
-        nombre.isBlank() -> null
-        nombre.trim().length < 3 -> "Mínimo 3 caracteres"
-        nombre.trim().length > 50 -> "Máximo 50 caracteres"
-        else -> null
-    }
-
-    // El formulario es válido solo si hay nombre de al menos 3 caracteres,
-       val formularioValido = nombre.trim().length >= 3 &&
-            nombreError == null &&
-            prioridadSeleccionada != null &&
-            tiempoSeleccionado != null
-
+    var showCalendar by rememberSaveable { mutableStateOf(false) }
     Scaffold(
+        modifier = modifier,
         topBar = {
-            TopAppBar(
-                title = { Text("Agregar Actividad") },
-                navigationIcon = {
-                    IconButton(onClick = onCancelar) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                }
-            )
+            TopAppBar(title = { Text("Agregar actividad") }, navigationIcon = {
+                TextButton(onClick = onBack, enabled = !state.isSaving) { Text("Volver") }
+            })
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Campo 1: Nombre
             OutlinedTextField(
-                value = nombre,
-                onValueChange = { nombre = it },
+                value = state.title,
+                onValueChange = onTitleChange,
                 label = { Text("Nombre de la actividad") },
-                placeholder = { Text("ej. Proyecto de Física") },
-                isError = nombreError != null,
-                supportingText = {
-                    if (nombreError != null) Text(nombreError)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                isError = state.titleTouched && state.titleError != null,
+                supportingText = { if (state.titleTouched) state.titleError?.let { Text(it) } },
+                enabled = !state.isSaving,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            // Campo 2: Prioridad
             Column {
-                Text("Nivel de prioridad", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Prioridad.values().forEach { opcion ->
+                Text("Prioridad", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Priority.entries.forEach { priority ->
                         FilterChip(
-                            selected = prioridadSeleccionada == opcion,
-                            onClick = { prioridadSeleccionada = opcion },
-                            label = { Text(opcion.name) }
+                            selected = state.priority == priority,
+                            onClick = { onPriorityChange(priority) },
+                            label = { Text(priority.displayName()) },
+                            enabled = !state.isSaving
                         )
                     }
                 }
+                if (state.priority == null) Text("Selecciona una prioridad.", color = MaterialTheme.colorScheme.error)
             }
-
-            // Campo 3: Tiempo estimado
-            Column {
-                Text("Tiempo estimado", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    opcionesTiempo.forEach { (etiqueta, minutos) ->
-                        FilterChip(
-                            selected = tiempoSeleccionado == minutos,
-                            onClick = { tiempoSeleccionado = minutos },
-                            label = { Text(etiqueta) }
-                        )
-                    }
-                }
-            }
-
-            // Fecha de entrega: por ahora fija en "hoy". Lo dejamos como texto simple;
-            // más adelante se puede reemplazar por un selector de fecha real.
-            Text(
-                text = "Fecha de entrega: Hoy (${LocalDate.now()})",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            OutlinedTextField(
+                value = state.estimatedMinutes,
+                onValueChange = onMinutesChange,
+                label = { Text("Tiempo estimado en minutos") },
+                isError = state.minutesTouched && state.minutesError != null,
+                supportingText = { if (state.minutesTouched) state.minutesError?.let { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                enabled = !state.isSaving,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            // Botón condicionado: solo se habilita si el formulario es válido.
-            Button(
-                onClick = {
-                    val nuevoId = (MockData.tareas.maxOfOrNull { it.id } ?: 0) + 1
-                    MockData.tareas.add(
-                        Tarea(
-                            id = nuevoId,
-                            titulo = nombre.trim(),
-                            prioridad = prioridadSeleccionada!!,
-                            tiempoEstimadoMinutos = tiempoSeleccionado!!,
-                            fechaEntrega = LocalDate.now(),
-                            estado = EstadoTarea.PENDIENTE
-                        )
-                    )
-                    onGuardar()
-                },
-                enabled = formularioValido,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text("Guardar Actividad")
+            OutlinedTextField(
+                value = state.dueDate,
+                onValueChange = onDateChange,
+                label = { Text("Fecha de entrega (AAAA-MM-DD)") },
+                isError = state.dateError != null,
+                supportingText = { state.dateError?.let { Text(it) } },
+                trailingIcon = { TextButton(onClick = { showCalendar = true }, enabled = !state.isSaving) { Text("Elegir") } },
+                enabled = !state.isSaving,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = state.notes,
+                onValueChange = onNotesChange,
+                label = { Text("Notas (opcional)") },
+                isError = state.notesError != null,
+                supportingText = { Text(state.notesError ?: "${state.notes.length}/500") },
+                enabled = !state.isSaving,
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth()
+            )
+            state.error?.let { FeedbackCard(it, isError = true) }
+            if (state.isSaving) LoadingState()
+            Button(onClick = onSave, enabled = state.isValid && !state.isSaving && !state.saved, modifier = Modifier.fillMaxWidth()) {
+                Text("Guardar actividad")
             }
         }
+    }
+    if (showCalendar) {
+        val initialDate = runCatching { LocalDate.parse(state.dueDate) }.getOrNull()
+            ?.takeIf { it.year in 1900..2100 } ?: LocalDate.now()
+        val picker = rememberDatePickerState(initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { showCalendar = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    picker.selectedDateMillis?.let { millis ->
+                        onDateChange(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString())
+                    }
+                    showCalendar = false
+                }, enabled = picker.selectedDateMillis != null) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton(onClick = { showCalendar = false }) { Text("Cancelar") } }
+        ) { DatePicker(state = picker) }
     }
 }
