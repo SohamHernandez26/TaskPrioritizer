@@ -11,50 +11,108 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
-class FirebaseAuthRepository(private val auth: FirebaseAuth) : AuthRepository {
+class FirebaseAuthRepository(
+    private val auth: FirebaseAuth
+) : AuthRepository {
+
     override val currentUserId: Flow<String?> = callbackFlow {
-        val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser?.uid) }
+        val listener = FirebaseAuth.AuthStateListener {
+            trySend(it.currentUser?.uid)
+        }
+
         auth.addAuthStateListener(listener)
-        awaitClose { auth.removeAuthStateListener(listener) }
+
+        awaitClose {
+            auth.removeAuthStateListener(listener)
+        }
     }
 
-    override suspend fun signIn(email: String, password: String): Result<Unit> = authenticate {
-        auth.signInWithEmailAndPassword(email.trim(), password).await()
+    override suspend fun signIn(
+        email: String,
+        password: String
+    ): Result<Unit> = authenticate("auth.signIn") {
+        auth.signInWithEmailAndPassword(
+            email.trim(),
+            password
+        ).await()
     }
 
-    override suspend fun signUp(email: String, password: String): Result<Unit> = authenticate {
-        auth.createUserWithEmailAndPassword(email.trim(), password).await()
+    override suspend fun signUp(
+        email: String,
+        password: String
+    ): Result<Unit> = authenticate("auth.signUp") {
+        auth.createUserWithEmailAndPassword(
+            email.trim(),
+            password
+        ).await()
     }
 
     override suspend fun signOut() {
         auth.signOut()
     }
 
-    private suspend fun authenticate(action: suspend () -> Unit): Result<Unit> = try {
-        val completed = withTimeoutOrNull(AUTH_TIMEOUT_MILLIS) {
-            action()
-            true
-        } ?: false
-        if (completed) {
-            Result.success(Unit)
-        } else {
-            Result.failure(IllegalStateException("Se agotó el tiempo de espera. Revisa tu conexión y vuelve a intentar."))
-        }
-    } catch (exception: CancellationException) {
-        throw exception
-    } catch (exception: Exception) {
-        val message = when (exception) {
-            is FirebaseNetworkException -> "Necesitas conexión para entrar o crear tu cuenta."
-            is FirebaseAuthException -> when (exception.errorCode) {
-                "ERROR_EMAIL_ALREADY_IN_USE" -> "Este correo ya tiene una cuenta. Usa Iniciar sesión."
-                "ERROR_WEAK_PASSWORD" -> "La contraseña no cumple la política del proyecto."
-                "ERROR_OPERATION_NOT_ALLOWED" -> "Activa Correo/contraseña en Firebase Authentication."
-                "ERROR_TOO_MANY_REQUESTS" -> "Se hicieron demasiados intentos. Espera unos minutos."
-                else -> "No se pudo acceder. Revisa el correo y la contraseña."
+    private suspend fun authenticate(
+        operation: String,
+        action: suspend () -> Unit
+    ): Result<Unit> {
+        return try {
+            val completed = withTimeoutOrNull(AUTH_TIMEOUT_MILLIS) {
+                action()
+                true
+            } ?: false
+
+            if (completed) {
+                Result.success(Unit)
+            } else {
+                val exception = IllegalStateException(
+                    "Authentication operation timed out."
+                )
+
+                RepositoryErrorReporter.record(
+                    "$operation.timeout",
+                    exception
+                )
+
+                Result.failure(
+                    IllegalStateException(
+                        "Se agotó el tiempo de espera. Revisa tu conexión y vuelve a intentar."
+                    )
+                )
             }
-            else -> "No se pudo acceder. Revisa la conexión e intenta nuevamente."
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            RepositoryErrorReporter.record(operation, exception)
+
+            val message = when (exception) {
+                is FirebaseNetworkException ->
+                    "Necesitas conexión para entrar o crear tu cuenta."
+
+                is FirebaseAuthException -> when (exception.errorCode) {
+                    "ERROR_EMAIL_ALREADY_IN_USE" ->
+                        "Este correo ya tiene una cuenta. Usa Iniciar sesión."
+
+                    "ERROR_WEAK_PASSWORD" ->
+                        "La contraseña no cumple la política del proyecto."
+
+                    "ERROR_OPERATION_NOT_ALLOWED" ->
+                        "Activa Correo/contraseña en Firebase Authentication."
+
+                    "ERROR_TOO_MANY_REQUESTS" ->
+                        "Se hicieron demasiados intentos. Espera unos minutos."
+
+                    else ->
+                        "No se pudo acceder. Revisa el correo y la contraseña."
+                }
+
+                else ->
+                    "No se pudo acceder. Revisa la conexión e intenta nuevamente."
+            }
+
+            Result.failure(
+                IllegalStateException(message, exception)
+            )
         }
-        Result.failure(IllegalStateException(message, exception))
     }
 
     private companion object {
