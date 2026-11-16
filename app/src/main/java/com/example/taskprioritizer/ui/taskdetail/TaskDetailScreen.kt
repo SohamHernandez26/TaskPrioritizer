@@ -64,7 +64,10 @@ fun TaskDetailScreen(
                     OutlinedButton(onClick = onScheduleReminder, enabled = !state.isSaving, modifier = Modifier.fillMaxWidth()) {
                         Text("Recordarme en 30 minutos")
                     }
-                    Text("El recordatorio se conserva en este teléfono y se muestra dentro de Mis tareas.", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = "El recordatorio se guarda en este teléfono. Después de 30 minutos, el aviso se mostrará al abrir Mis tareas o mientras estés en esa pantalla. No envía notificaciones fuera de la app.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 } else {
                     Text("Actividad completada", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 }
