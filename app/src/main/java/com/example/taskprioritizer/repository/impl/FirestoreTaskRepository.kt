@@ -227,17 +227,19 @@ class FirestoreTaskRepository(
         title = getString("title").orEmpty(),
         notes = getString("notes").orEmpty(),
         priority = when (getString("priority")) {
-            "HIGH", "ALTA" -> Priority.HIGH
-            "LOW", "BAJA" -> Priority.LOW
-            else -> Priority.MEDIUM
+            "HIGH" -> Priority.HIGH
+            "MEDIUM" -> Priority.MEDIUM
+            "LOW" -> Priority.LOW
+            else -> throw IllegalArgumentException("Invalid task priority.")
         },
         estimatedMinutes = (getLong("estimatedMinutes") ?: 30L).toInt(),
         dueDate = LocalDate.parse(
             getString("dueDate") ?: LocalDate.now().toString()
         ),
         status = when (getString("status")) {
-            "COMPLETED", "COMPLETADA" -> TaskStatus.COMPLETED
-            else -> TaskStatus.PENDING
+            "PENDING" -> TaskStatus.PENDING
+            "COMPLETED" -> TaskStatus.COMPLETED
+            else -> throw IllegalArgumentException("Invalid task status.")
         },
         ownerId = ownerId,
         createdAt = getLong("createdAt") ?: 0L
