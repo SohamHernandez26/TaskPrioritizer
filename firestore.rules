@@ -29,10 +29,10 @@ service cloud.firestore {
             allow create: if isOwner(userId) && validTask(userId)
                 && request.resource.data.status == 'PENDING';
             allow update: if isOwner(userId) && validTask(userId)
-                && resource.data.status in ['PENDING', 'PENDIENTE']
+                && resource.data.status == 'PENDING'
                 && request.resource.data.createdAt == resource.data.get('createdAt', 0);
             allow delete: if isOwner(userId)
-                && resource.data.status in ['PENDING', 'PENDIENTE'];
+                && resource.data.status == 'PENDING';
         }
         match /{document=**} {
             allow read, write: if false;

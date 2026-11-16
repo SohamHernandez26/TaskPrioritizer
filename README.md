@@ -66,9 +66,11 @@ En macOS/Linux, utilizar `./gradlew` en lugar de `.\gradlew.bat`.
 - [ViewModelTest](app/src/test/java/com/example/taskprioritizer/ViewModelTest.kt) usa repositorios de prueba para comprobar estados y operaciones.
 - [ReminderPersistenceTest](app/src/androidTest/java/com/example/taskprioritizer/ReminderPersistenceTest.kt) requiere dispositivo o emulador y se ejecuta por separado con `./gradlew connectedDebugAndroidTest`. La existencia de esta prueba no implica que haya sido ejecutada.
 
-El equipo confirmó compilación y pruebas unitarias satisfactorias después de aclarar el recordatorio, además de revisar el texto en un teléfono. Las verificaciones y capturas del build final se registran en el PR; este documento no sustituye esas evidencias.
+El equipo confirmó compilación y pruebas unitarias satisfactorias después de aclarar el recordatorio y al integrar Crashlytics; también comprobó el texto y el funcionamiento en un teléfono. Las verificaciones y capturas del build final se registran en el PR; este documento no sustituye esas evidencias.
 
 ### Firma y distribución
+
+Esta revisión prepara `versionName = 1.3` y `versionCode = 4`. Preparar la versión en Gradle no significa que ya esté publicada ni validada por testers.
 
 Para actualizar una instalación distribuida, conservar el identificador y la clave de firma y aumentar `versionCode`. La clave compartida del equipo se mantiene fuera del repositorio. Si se necesita seleccionarla desde PowerShell:
 
@@ -130,6 +132,14 @@ Los Composables de contenido reciben estado y callbacks. Cada ViewModel mantiene
 
 [TaskRules](app/src/main/java/com/example/taskprioritizer/model/TaskRules.kt) concentra validación y ordenamiento. Los repositorios trabajan con los modelos de dominio [Task](app/src/main/java/com/example/taskprioritizer/model/Task.kt) y [Reminder](app/src/main/java/com/example/taskprioritizer/model/Reminder.kt).
 
+### Monitoreo y formato de datos
+
+[RepositoryErrorReporter](app/src/main/java/com/example/taskprioritizer/repository/impl/RepositoryErrorReporter.kt) registra excepciones no fatales mediante Crashlytics. Recibe el nombre de la operación y la excepción desde los repositorios; conserva el tipo y la pila del error sin enviar su mensaje original. Las cancelaciones normales de coroutines no se reportan como fallos. Los ViewModels conservan el manejo de errores para la interfaz.
+
+En Firestore, una escritura que sigue pendiente después de la espera acotada no se considera fallida. Un rechazo posterior se registra mediante el listener de fallo. La lectura acepta explícitamente `HIGH`, `MEDIUM`, `LOW`, `PENDING` y `COMPLETED`; un valor desconocido produce un error controlado. El equipo confirmó que revisó los valores existentes antes de retirar la compatibilidad antigua. Las reglas locales también usan exclusivamente estos valores; debe verificarse su publicación en el backend.
+
+Para comprobar un evento no fatal, intentar iniciar sesión sin conexión, recuperar internet y cerrar y reabrir la app. Buscar en Crashlytics la operación `auth.signIn` o `auth.signIn.timeout` y comprobar que su versión coincide con la distribuida. No hace falta provocar un cierre deliberado de la aplicación para esta prueba.
+
 **Decisiones técnicas:**
 
 - Firestore guarda tareas asociadas a la cuenta y permite sincronización. Room guarda recordatorios propios de este dispositivo y permite consultarlos sin depender de una respuesta de red.
@@ -138,7 +148,7 @@ Los Composables de contenido reciben estado y callbacks. Cada ViewModel mantiene
 
 ## 5. Mínimos técnicos
 
-Estado de integración: M13 y la evidencia del build final aún deben completarse. Esta tabla identifica el código disponible sin certificar requisitos pendientes.
+El código integra Crashlytics y la lectura estricta de los valores de prioridad y estado en inglés. La evidencia de distribución y las comprobaciones del build evaluable se documentan en el PR final; una implementación en código no sustituye una prueba sobre ese build.
 
 | ID | Implementación o evidencia | Estado de esta revisión |
 | --- | --- | --- |
@@ -154,7 +164,7 @@ Estado de integración: M13 y la evidencia del build final aún deben completars
 | M10 | [Components.kt](app/src/main/java/com/example/taskprioritizer/ui/common/Components.kt), [HomeViewModel](app/src/main/java/com/example/taskprioritizer/ui/home/HomeViewModel.kt), [FirebaseAuthRepository](app/src/main/java/com/example/taskprioritizer/repository/impl/FirebaseAuthRepository.kt) | Estados de carga, error, vacío y esperas acotadas. |
 | M11 | [ReminderEntity](app/src/main/java/com/example/taskprioritizer/data/local/ReminderEntity.kt), [ReminderDao](app/src/main/java/com/example/taskprioritizer/data/local/ReminderDao.kt), [TaskDatabase](app/src/main/java/com/example/taskprioritizer/data/local/TaskDatabase.kt) | Persistencia local comprobada manualmente; prueba instrumentada disponible. |
 | M12 | [Código principal](app/src/main/java/com/example/taskprioritizer), [TaskRules](app/src/main/java/com/example/taskprioritizer/model/TaskRules.kt) | Nombres de clases y datos en inglés, paquetes por responsabilidad. Revisión completa contra la tabla de convenciones de Entrega 4 aún requerida. |
-| M13 | [Gradle del módulo](app/build.gradle.kts), [repositorios a instrumentar](app/src/main/java/com/example/taskprioritizer/repository/impl) | No implementado en esta revisión: falta integrar Crashlytics y comprobar un evento no fatal. Estos enlaces señalan los archivos de trabajo, no una implementación terminada. |
+| M13 | [Gradle del módulo](app/build.gradle.kts), [RepositoryErrorReporter.record](app/src/main/java/com/example/taskprioritizer/repository/impl/RepositoryErrorReporter.kt), [repositorios](app/src/main/java/com/example/taskprioritizer/repository/impl) | Implementado en autenticación, Firestore y Room. El equipo confirmó un evento no fatal de autenticación sin conexión durante la integración. Se debe adjuntar en el PR el evento correspondiente al build final distribuido. |
 | M14 | [Versión y firma](app/build.gradle.kts) | Hubo distribución de versiones anteriores. Faltan publicación y captura de descargas de dos testers externos del build final en el PR. |
 | M15 | [TaskRulesTest](app/src/test/java/com/example/taskprioritizer/TaskRulesTest.kt), [ViewModelTest](app/src/test/java/com/example/taskprioritizer/ViewModelTest.kt) | Pruebas unitarias y comprobaciones manuales anteriores satisfactorias. Repetir el flujo en el build final; el código por sí solo no demuestra ausencia de bugs críticos. |
 
@@ -181,7 +191,7 @@ La importación desde Canvas/Outlook (F6) ya estaba excluida en la planificació
 ### Referencias
 
 - [Guía oficial de arquitectura Android](https://developer.android.com/topic/architecture).
-- [Inicio de Firebase Crashlytics para Android](https://firebase.google.com/docs/crashlytics/get-started?platform=android), referencia para la integración pendiente.
+- [Inicio de Firebase Crashlytics para Android](https://firebase.google.com/docs/crashlytics/get-started?platform=android).
 - [Distribución de Android desde la consola Firebase](https://firebase.google.com/docs/app-distribution/android/distribute-console).
 - Material del curso: publicación de Entrega 4 y su tabla de convenciones; publicación «Entrega final: producto, demo y defensa»; hojas «Pruebas y App Distribution» y «Cross-review».
 
